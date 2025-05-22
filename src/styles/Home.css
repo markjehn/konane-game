@@ -1,0 +1,45 @@
+/* Home.css */
+.home-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #f4f4f4; /* You can choose a solid color or image here */
+}
+
+.title {
+  font-size: 3rem;
+  color: #333;
+  margin-bottom: 40px;
+  font-family: 'Arial', sans-serif;
+}
+
+.button-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.home-button {
+  padding: 15px 30px;
+  font-size: 1.2rem;
+  text-decoration: none;
+  background-color: #007BFF;
+  color: white;
+  border-radius: 8px;
+  width: 200px;
+  text-align: center;
+  transition: background-color 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.home-button:hover {
+  background-color: #0056b3;
+}
+
+.home-button:active {
+  background-color: #004085;
+}
+
+/* Piece styling */

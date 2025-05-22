@@ -1,0 +1,123 @@
+/* Reset default margin and ensure full viewport usage */
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+  background-color: #f0f0f0;
+}
+
+/* Main container for title and board */
+.game-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* Title styling */
+.game-container h1 {
+  font-size: 2.5rem;
+  margin-bottom: 20px;
+}
+
+/* Game board container */
+.game-board {
+  display: flex;
+  flex-direction: column;
+  width: 600px;
+  height: 600px;
+  border: 2px solid #000000;
+  background-color: #d9d9d9;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  
+}
+
+/* Each row on the board */
+.board-row {
+  display: flex;
+  flex: 1;
+  
+}
+
+/* Each tile on the board */
+.board-tile {
+  width: 75px;
+  height: 75px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* Piece base styling */
+.piece {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.3s ease;
+}
+
+/* Black piece */
+.piece.black {
+  background-color: black;
+}
+
+/* White piece with border for visibility */
+.piece.white {
+  background-color: white;
+  border: 2px solid #333;
+}
+
+/* Selected tile outline */
+.selected {
+  border: 2px solid red;
+}
+.piece-img {
+  width: 50px;   /* Set size to match your piece size */
+  height: 50px;  /* Set size to match your piece size */
+  border-radius: 50%; /* Ensure the image is circular */
+  object-fit: cover; /* Ensures the image covers the area without distortion */
+}
+.piece {
+  width: 50px;
+  height: 50px;
+}
+
+
+.turn-message {
+  font-weight: bold;
+  font-size: 24px;
+  margin-bottom: 15px;
+}
+
+.piece {
+  transition: box-shadow 0.3s ease;
+}
+
+.piece:hover {
+  box-shadow: 0 0 10px 5px rgba(255, 255, 0, 0.8); /* yellow glow */
+  cursor: pointer;
+}
+
+.highlight::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  border: 3px solid yellow;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  box-shadow: 0 0 10px 3px yellow;
+}

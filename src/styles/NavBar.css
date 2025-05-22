@@ -1,0 +1,23 @@
+.navbar {
+    background-color: #222;
+    padding: 10px 20px;
+  }
+  
+  .nav-list {
+    list-style: none;
+    display: flex;
+    gap: 20px;
+  }
+  
+  .nav-list li a {
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+  }
+  
+  .nav-list li a:hover {
+    color: #ffd700; /* gold color on hover */
+  }
+  
