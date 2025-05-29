@@ -27,77 +27,101 @@ function GameBoard() {
   const [winner, setWinner] = useState(null);
   const [turnMessage, setTurnMessage] = useState("Black: Remove one of your stones");
   const [possibleMoves, setPossibleMoves] = useState([]);
+  const [multiJumpActive, setMultiJumpActive] = useState(false);
+  const [multiJumpPath, setMultiJumpPath] = useState([]);
   
 
-  const isValidMove = (from, to, currentTurn = turn) => {
+  const cloneBoard = (board) => board.map((row) => row.map((tile) => ({ ...tile })));
+
+  const isValidMove = (from, to, currentBoard, currentTurn) => {
     const dx = to.row - from.row;
     const dy = to.col - from.col;
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
 
-    if (absDx === 2 && dy === 0) {
-      const middle = board[from.row + dx / 2][from.col];
-      return middle.piece && middle.piece !== currentTurn && !to.piece;
-    }
+    if ((absDx === 2 && dy === 0) || (absDy === 2 && dx === 0)) {
+      const middleRow = from.row + dx / 2;
+      const middleCol = from.col + dy / 2;
+      const middle = currentBoard[middleRow][middleCol];
 
-    if (absDy === 2 && dx === 0) {
-      const middle = board[from.row][from.col + dy / 2];
-      return middle.piece && middle.piece !== currentTurn && !to.piece;
+      return (
+        middle.piece &&
+        middle.piece !== currentTurn &&
+        to.piece === null
+      );
     }
-
     return false;
   };
 
-  const getValidMovesForTile = (tile) => {
+  const getValidJumps = (tile, currentBoard, currentTurn) => {
     const directions = [
-      {dx:2, dy:0},
-      {dx: -2, dy:0},
-      {dx: 0, dy:2},
-      {dx: 0, dy: -2},
+      { dx: 2, dy: 0 },
+      { dx: -2, dy: 0 },
+      { dx: 0, dy: 2 },
+      { dx: 0, dy: -2 },
     ];
 
-    const moves = [];
-
-    for (const {dx, dy} of directions) {
+    const jumps = [];
+    for (const { dx, dy } of directions) {
       const newRow = tile.row + dx;
       const newCol = tile.col + dy;
-
       if (
-        newRow >= 0 &&
-        newRow < size &&
-        newCol >= 0 &&
-        newCol < size &&
-        isValidMove(tile, board[newRow][newCol])
+        newRow >= 0 && newRow < size &&
+        newCol >= 0 && newCol < size
       ) {
-        moves.push({ row: newRow, col: newCol});
+        const toTile = currentBoard[newRow][newCol];
+        if (isValidMove(tile, toTile, currentBoard, currentTurn)) {
+          jumps.push({ row: newRow, col: newCol });
+        }
       }
     }
-    return moves;
-  }
+    return jumps;
+  };
 
-  const hasAnyValidMoves = (currentTurn) => {
-    for (let row = 0; row < size; row++) {
-      for (let col = 0; col < size; col++) {
-        const tile = board[row][col];
-        if (tile.piece === currentTurn) {
-          const directions = [
-            { dx: 2, dy: 0 },
-            { dx: -2, dy: 0 },
-            { dx: 0, dy: 2 },
-            { dx: 0, dy: -2 },
-          ];
-          for (const { dx, dy } of directions) {
-            const newRow = row + dx;
-            const newCol = col + dy;
-            if (
-              newRow >= 0 &&
-              newRow < size &&
-              newCol >= 0 &&
-              newCol < size &&
-              isValidMove(tile, board[newRow][newCol], currentTurn)
-            ) {
-              return true;
-            }
+  const getMultiJumpSequences = (tile, currentBoard, currentTurn, path = [], visited = new Set()) => {
+    const key = `${tile.row},${tile.col}`;
+    if (visited.has(key)) return [];
+
+    visited.add(key);
+    const validJumps = getValidJumps(tile, currentBoard, currentTurn);
+    let sequences = [];
+
+    if (validJumps.length === 0) {
+      return path.length > 0 ? [path] : [];
+    }
+
+    for (const jump of validJumps) {
+      const dx = jump.row - tile.row;
+      const dy = jump.col - tile.col;
+      const midRow = tile.row + dx / 2;
+      const midCol = tile.col + dy / 2;
+
+      const nextBoard = cloneBoard(currentBoard);
+      nextBoard[tile.row][tile.col].piece = null;
+      nextBoard[jump.row][jump.col].piece = currentTurn;
+      nextBoard[midRow][midCol].piece = null;
+
+      const newTile = { row: jump.row, col: jump.col, piece: currentTurn };
+      const extendedPaths = getMultiJumpSequences(
+        newTile,
+        nextBoard,
+        currentTurn,
+        [...path, jump],
+        new Set(visited)
+      );
+
+      sequences.push(...extendedPaths);
+    }
+
+    return sequences;
+  };
+
+  const hasAnyValidMoves = (currentTurn, currentBoard = board) => {
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        if (currentBoard[r][c].piece === currentTurn) {
+          if (getValidJumps(currentBoard[r][c], currentBoard, currentTurn).length > 0) {
+            return true;
           }
         }
       }
@@ -112,76 +136,102 @@ function GameBoard() {
 
     if (!removalPhase[turn]) {
       if (clickedTile.piece === turn) {
-        const newBoard = [...board];
-        newBoard[row][col] = { ...clickedTile, piece: null };
+        const newBoard = cloneBoard(board);
+        newBoard[row][col].piece = null;
         setBoard(newBoard);
-        const updatedRemoval = { ...removalPhase, [turn]: true };
-        setRemovalPhase(updatedRemoval);
-        const nextTurn = turn === "B" ? "W" : "B";
-        setTurn(nextTurn);
-        if (!updatedRemoval["W"] && turn === "B") {
+        setRemovalPhase({ ...removalPhase, [turn]: true });
+
+        if (turn === "B") {
+          setTurn("W");
           setTurnMessage("White: Remove one of your stones");
         } else {
+          setTurn("B");
           setTurnMessage("Black's turn: Jump over a white piece");
         }
+        return;
       }
       return;
     }
 
-    if (!removalPhase["B"] || !removalPhase["W"]) return;
+    if (multiJumpActive) {
+      const nextStep = multiJumpPath[0];
+      if (nextStep && nextStep.row === row && nextStep.col === col) {
+        executeJump(selectedTile, clickedTile);
+        setMultiJumpPath(multiJumpPath.slice(1));
+      }
+      return;
+    }
 
-    if (!selectedTile) {
-      if (clickedTile.piece === turn) {
-        setSelectedTile(clickedTile);
-        const moves = getValidMovesForTile(clickedTile);
-        setPossibleMoves(moves);
+    if (clickedTile.piece === turn) {
+      setSelectedTile(clickedTile);
+      const sequences = getMultiJumpSequences(clickedTile, board, turn);
+      const flatMoves = [...new Set(sequences.map(seq => JSON.stringify(seq[0])))].map(str => JSON.parse(str));
+      setPossibleMoves(flatMoves);
+      setMultiJumpActive(false);
+      setTurnMessage(`${turn === "B" ? "Black" : "White"}: Select a piece to jump`);
+      return;
+    }
+
+    if (selectedTile && possibleMoves.some(move => move.row === row && move.col === col)) {
+      const sequences = getMultiJumpSequences(selectedTile, board, turn);
+      const path = sequences.find(seq => seq[0].row === row && seq[0].col === col);
+
+      if (path && path.length > 0) {
+        setMultiJumpPath(path.slice(1));
+        executeJump(selectedTile, { row, col }, true);
       }
     } else {
-      if (isValidMove(selectedTile, clickedTile)) {
-        const newBoard = [...board];
-        const dx = clickedTile.row - selectedTile.row;
-        const dy = clickedTile.col - selectedTile.col;
+      setSelectedTile(null);
+      setPossibleMoves([]);
+      setMultiJumpActive(false);
+    }
+  };
 
-        newBoard[clickedTile.row][clickedTile.col] = {
-          ...clickedTile,
-          piece: turn,
-        };
-        newBoard[selectedTile.row][selectedTile.col] = {
-          ...selectedTile,
-          piece: null,
-        };
+  const executeJump = (fromTile, toTile, isInitial = false) => {
+    const newBoard = cloneBoard(board);
+    const dx = toTile.row - fromTile.row;
+    const dy = toTile.col - fromTile.col;
+    const midRow = fromTile.row + dx / 2;
+    const midCol = fromTile.col + dy / 2;
 
-        const middleRow = selectedTile.row + dx / 2;
-        const middleCol = selectedTile.col + dy / 2;
-        newBoard[middleRow][middleCol] = {
-          ...newBoard[middleRow][middleCol],
-          piece: null,
-        };
+    newBoard[toTile.row][toTile.col].piece = turn;
+    newBoard[fromTile.row][fromTile.col].piece = null;
+    newBoard[midRow][midCol].piece = null;
 
-        const nextTurn = turn === "B" ? "W" : "B";
-        const canMove = hasAnyValidMoves(nextTurn);
+    setBoard(newBoard);
 
-        setBoard(newBoard);
-        setSelectedTile(null);
-        setPossibleMoves([]);
+    const newSelected = { row: toTile.row, col: toTile.col, piece: turn };
+    const nextJumps = getValidJumps(newSelected, newBoard, turn);
 
-        if (!canMove) {
-          setWinner(turn);
-          setTurnMessage(`Game Over - ${turn === "B" ? "Black" : "White"} Wins!`);
-        } else {
-          setTurn(nextTurn);
-          setTurnMessage(
-            nextTurn === "B"
-              ? "Black's turn: Jump over a white piece"
-              : "White's turn: Jump over a black piece"
-          );
-        }
-      } else {
-        setPossibleMoves([]);
-        setSelectedTile(null);
-      
+    if (nextJumps.length > 0 && (multiJumpPath.length > 0 || isInitial)) {
+      const continueJump = window.confirm("You can continue jumping. Do you want to continue?");
+      if (continueJump) {
+        setSelectedTile(newSelected);
+        setPossibleMoves(nextJumps);
+        setMultiJumpActive(true);
+        setTurnMessage(`${turn === "B" ? "Black" : "White"}: Continue jumping`);
+        return;
       }
     }
+
+    const nextTurn = turn === "B" ? "W" : "B";
+    if (!hasAnyValidMoves(nextTurn, newBoard)) {
+      setWinner(turn);
+      setTurnMessage(`Game Over - ${turn === "B" ? "Black" : "White"} Wins!`);
+      setTurn(nextTurn);
+      return;
+    }
+
+    setSelectedTile(null);
+    setPossibleMoves([]);
+    setMultiJumpActive(false);
+    setMultiJumpPath([]);
+    setTurn(nextTurn);
+    setTurnMessage(
+      nextTurn === "B"
+        ? "Black's turn: Jump over a white piece"
+        : "White's turn: Jump over a black piece"
+    );
   };
 
   return (
@@ -197,8 +247,16 @@ function GameBoard() {
                 <div
                   key={colIndex}
                   className={`board-tile ${
-                    possibleMoves.some(move => move.row === tile.row && move.col === tile.col)
+                    possibleMoves.some(
+                      (move) => move.row === tile.row && move.col === tile.col
+                    )
                       ? "highlight"
+                      : ""
+                  } ${
+                    selectedTile &&
+                    selectedTile.row === tile.row &&
+                    selectedTile.col === tile.col
+                      ? "selected"
                       : ""
                   }`}
                   onClick={() => handleTileClick(tile.row, tile.col)}
@@ -220,7 +278,6 @@ function GameBoard() {
           ))}
         </div>
       </div>
-      
     </div>
   );
 }
