@@ -27,9 +27,9 @@ const Home = () => {
         <button>
           <Link to="/how-to-play">How to Play</Link>
         </button>
-        <button>
+        {/*} <button>
           <Link to="/history">History</Link>
-        </button>
+        </button> */}
       </div>
 
       <footer>

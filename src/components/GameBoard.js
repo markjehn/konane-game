@@ -37,6 +37,9 @@ function GameBoard() {
   const [playerColor, setPlayerColor] = useState(null);
   const [history, setHistory] = useState([]);
   const computerDecidesToContinue = () => Math.random() < 0.5; // 50% chance to continue
+  
+
+
   const computerMultiJump = (fromTile, currentBoard) => {
     const jumps = getValidJumps(fromTile, currentBoard, turn);
     if (jumps.length === 0) {
@@ -258,6 +261,7 @@ function GameBoard() {
   };
 
   const executeJump = (fromTile, toTile) => {
+  
     const newBoard = cloneBoard(board);
     const dx = toTile.row - fromTile.row;
     const dy = toTile.col - fromTile.col;
@@ -378,7 +382,7 @@ function GameBoard() {
         {(mode === "pvp" || (mode === "pvc" && playerColor !== null)) && (
           <>
             <p className={`turn-message ${pulseActive ? "pulse" : ""}`}>{turnMessage}</p>
-            {removalPhase.B && removalPhase.W && (
+            
               <div className="button-container">
                 <button
                   onClick={handleUndo}
@@ -395,7 +399,7 @@ function GameBoard() {
                   End Turn
                 </button>
               </div>
-            )}
+            
             <div className="game-board">
               {board.map((row, rowIndex) => (
                 <div key={rowIndex} className="board-row">
