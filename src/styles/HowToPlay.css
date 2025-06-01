@@ -1,0 +1,50 @@
+/* Container for the whole content */
+.how-to-play-container {
+    max-width: 700px;
+    margin: 40px auto 80px;
+    padding: 30px 25px;
+    background-color: #f9f9f9;
+    border-radius: 14px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #222;
+    line-height: 1.6;
+    text-align: left;
+  }
+  
+  /* Centered headings */
+  .how-to-play-container h1,
+  .how-to-play-container h2 {
+    text-align: center;
+    color: #000000; /* deep blue for headings */
+    margin-bottom: 15px;
+    font-weight: 700;
+  }
+  
+  /* Main title (top of page) */
+  .how-to-play-container h1:first-of-type {
+    font-size: 3rem;
+    margin-bottom: 40px;
+    letter-spacing: 2px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  /* Section headings */
+  .how-to-play-container h2 {
+    font-size: 1.75rem;
+    margin-top: 35px;
+  }
+  
+  /* Paragraph styling */
+  .how-to-play-container p {
+    font-size: 1.1rem;
+    margin-bottom: 22px;
+    color: #444;
+  }
+  
+  /* NavBar container spacing */
+  .navbar-wrapper {
+    margin-bottom: 30px;
+    text-align: center;
+  }
+  
