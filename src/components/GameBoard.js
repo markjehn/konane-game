@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../styles/GameBoard.css";
 import NavBar from "./NavBar";
 import blackPiece from "../assets/images/black-piece.png";
 import whitePiece from "../assets/images/white-piece.png";
+import { useLocation } from "react-router-dom";
+
 
 function GameBoard() {
   const size = 8;
@@ -12,7 +14,7 @@ function GameBoard() {
     for (let i = 0; i < size; i++) {
       const row = [];
       for (let j = 0; j < size; j++) {
-        const piece = (i + j) % 2 === 0 ? "B" : "W";
+        const piece = (i + j) % 2 === 0 ? "W" : "B";
         row.push({ row: i, col: j, piece });
       }
       board.push(row);
@@ -28,10 +30,95 @@ function GameBoard() {
   const [turnMessage, setTurnMessage] = useState("Black: Remove one of your stones");
   const [possibleMoves, setPossibleMoves] = useState([]);
   const [multiJumpActive, setMultiJumpActive] = useState(false);
-  const [multiJumpPath, setMultiJumpPath] = useState([]);
-  
+  const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+  const [pulseActive, setPulseActive] = useState(false);
+  const [showWinnerModal, setShowWinnerModal] = useState(false);
+  const location = useLocation();
+  const { mode } = location.state || { mode: "pvp" };
+  const [playerColor, setPlayerColor] = useState(null);
+
+
+
+  useEffect(() => {
+    if (mode === "pvc") {
+      // NEW: For pvc mode, wait for playerColor to be set before starting game
+      setTurn("B"); // Black always starts, but actual game waits for color choice
+      setPlayerColor(null); // Reset color choice on mount
+    } else {
+      // pvp mode: start immediately with Black's turn and no color choice needed
+      setTurn("B");
+      setPlayerColor("B"); // Just set playerColor to B to skip color choice UI
+    }
+  }, [mode]);
+
+  // NEW: Handle player color choice and start game immediately
+  const handlePlayerColorChoice = (color) => {
+    setPlayerColor(color);
+    setTurn("B"); // Black always starts game
+  };
+
+
+
+  // History stack for undo
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    setPulseActive(true);
+    const timer = setTimeout(() => setPulseActive(false), 1500);
+    return () => clearTimeout(timer);
+  }, [turnMessage]);
+
+  useEffect(() => {
+    if (winner !== null) {
+      setShowWinnerModal(true); // NEW
+    }
+  }, [winner]); // NEW
+
+  const resetGame = () => {
+    setBoard(createBoard());
+    setTurn("B");
+    setSelectedTile(null);
+    setRemovalPhase({ B: false, W: false });
+    setWinner(null);
+    setTurnMessage("Black: Remove one of your stones");
+    setPossibleMoves([]);
+    setMultiJumpActive(false);
+    setHistory([]);
+    setShowWinnerModal(false);
+  };
 
   const cloneBoard = (board) => board.map((row) => row.map((tile) => ({ ...tile })));
+
+  // Save a snapshot before making changes
+  const saveHistory = () => {
+    const snapshot = {
+      board: cloneBoard(board),
+      turn,
+      selectedTile,
+      removalPhase: { ...removalPhase },
+      winner,
+      turnMessage,
+      possibleMoves: [...possibleMoves],
+      multiJumpActive,
+    };
+    setHistory((prev) => [...prev, snapshot]);
+  };
+
+  const handleUndo = () => {
+    if (history.length === 0) return;
+
+    const previous = history[history.length - 1];
+    setBoard(previous.board);
+    setTurn(previous.turn);
+    setSelectedTile(previous.selectedTile);
+    setRemovalPhase(previous.removalPhase);
+    setWinner(previous.winner);
+    setTurnMessage(previous.turnMessage);
+    setPossibleMoves(previous.possibleMoves);
+    setMultiJumpActive(previous.multiJumpActive);
+
+    setHistory((prev) => prev.slice(0, -1)); // Remove last snapshot
+  };
 
   const isValidMove = (from, to, currentBoard, currentTurn) => {
     const dx = to.row - from.row;
@@ -43,17 +130,12 @@ function GameBoard() {
       const middleRow = from.row + dx / 2;
       const middleCol = from.col + dy / 2;
       const middle = currentBoard[middleRow][middleCol];
-
-      return (
-        middle.piece &&
-        middle.piece !== currentTurn &&
-        to.piece === null
-      );
+      return middle.piece && middle.piece !== currentTurn && to.piece === null;
     }
     return false;
   };
 
-  const getValidJumps = (tile, currentBoard, currentTurn) => {
+  const getValidJumps = (tile, currentBoard, currentTurn, direction = null) => {
     const directions = [
       { dx: 2, dy: 0 },
       { dx: -2, dy: 0 },
@@ -63,12 +145,12 @@ function GameBoard() {
 
     const jumps = [];
     for (const { dx, dy } of directions) {
+      if (direction && (dx !== direction.dx || dy !== direction.dy)) {
+        continue;
+      }
       const newRow = tile.row + dx;
       const newCol = tile.col + dy;
-      if (
-        newRow >= 0 && newRow < size &&
-        newCol >= 0 && newCol < size
-      ) {
+      if (newRow >= 0 && newRow < size && newCol >= 0 && newCol < size) {
         const toTile = currentBoard[newRow][newCol];
         if (isValidMove(tile, toTile, currentBoard, currentTurn)) {
           jumps.push({ row: newRow, col: newCol });
@@ -76,44 +158,6 @@ function GameBoard() {
       }
     }
     return jumps;
-  };
-
-  const getMultiJumpSequences = (tile, currentBoard, currentTurn, path = [], visited = new Set()) => {
-    const key = `${tile.row},${tile.col}`;
-    if (visited.has(key)) return [];
-
-    visited.add(key);
-    const validJumps = getValidJumps(tile, currentBoard, currentTurn);
-    let sequences = [];
-
-    if (validJumps.length === 0) {
-      return path.length > 0 ? [path] : [];
-    }
-
-    for (const jump of validJumps) {
-      const dx = jump.row - tile.row;
-      const dy = jump.col - tile.col;
-      const midRow = tile.row + dx / 2;
-      const midCol = tile.col + dy / 2;
-
-      const nextBoard = cloneBoard(currentBoard);
-      nextBoard[tile.row][tile.col].piece = null;
-      nextBoard[jump.row][jump.col].piece = currentTurn;
-      nextBoard[midRow][midCol].piece = null;
-
-      const newTile = { row: jump.row, col: jump.col, piece: currentTurn };
-      const extendedPaths = getMultiJumpSequences(
-        newTile,
-        nextBoard,
-        currentTurn,
-        [...path, jump],
-        new Set(visited)
-      );
-
-      sequences.push(...extendedPaths);
-    }
-
-    return sequences;
   };
 
   const hasAnyValidMoves = (currentTurn, currentBoard = board) => {
@@ -134,8 +178,10 @@ function GameBoard() {
 
     const clickedTile = board[row][col];
 
+    // Removal phase
     if (!removalPhase[turn]) {
       if (clickedTile.piece === turn) {
+        saveHistory(); // Save before removing
         const newBoard = cloneBoard(board);
         newBoard[row][col].piece = null;
         setBoard(newBoard);
@@ -148,38 +194,35 @@ function GameBoard() {
           setTurn("B");
           setTurnMessage("Black's turn: Jump over a white piece");
         }
-        return;
       }
       return;
     }
 
+    // Multi-jump mode: allow user to choose among possible next jumps
     if (multiJumpActive) {
-      const nextStep = multiJumpPath[0];
-      if (nextStep && nextStep.row === row && nextStep.col === col) {
-        executeJump(selectedTile, clickedTile);
-        setMultiJumpPath(multiJumpPath.slice(1));
+      if (possibleMoves.some((move) => move.row === row && move.col === col)) {
+        saveHistory();
+        executeJump(selectedTile, { row, col });
       }
       return;
     }
 
+    // Select a piece
     if (clickedTile.piece === turn) {
       setSelectedTile(clickedTile);
-      const sequences = getMultiJumpSequences(clickedTile, board, turn);
-      const flatMoves = [...new Set(sequences.map(seq => JSON.stringify(seq[0])))].map(str => JSON.parse(str));
-      setPossibleMoves(flatMoves);
-      setMultiJumpActive(false);
-      setTurnMessage(`${turn === "B" ? "Black" : "White"}: Select a piece to jump`);
+      const jumps = getValidJumps(clickedTile, board, turn);
+      setPossibleMoves(jumps);
+      setTurnMessage(`${turn === "B" ? "Black" : "White"}: Select a move`);
       return;
     }
 
-    if (selectedTile && possibleMoves.some(move => move.row === row && move.col === col)) {
-      const sequences = getMultiJumpSequences(selectedTile, board, turn);
-      const path = sequences.find(seq => seq[0].row === row && seq[0].col === col);
-
-      if (path && path.length > 0) {
-        setMultiJumpPath(path.slice(1));
-        executeJump(selectedTile, { row, col }, true);
-      }
+    // Initial jump
+    if (
+      selectedTile &&
+      possibleMoves.some((move) => move.row === row && move.col === col)
+    ) {
+      saveHistory();
+      executeJump(selectedTile, { row, col });
     } else {
       setSelectedTile(null);
       setPossibleMoves([]);
@@ -187,7 +230,7 @@ function GameBoard() {
     }
   };
 
-  const executeJump = (fromTile, toTile, isInitial = false) => {
+  const executeJump = (fromTile, toTile) => {
     const newBoard = cloneBoard(board);
     const dx = toTile.row - fromTile.row;
     const dy = toTile.col - fromTile.col;
@@ -201,20 +244,21 @@ function GameBoard() {
     setBoard(newBoard);
 
     const newSelected = { row: toTile.row, col: toTile.col, piece: turn };
-    const nextJumps = getValidJumps(newSelected, newBoard, turn);
+    const nextJumps = getValidJumps(newSelected, newBoard, turn, { dx, dy });
 
-    if (nextJumps.length > 0 && (multiJumpPath.length > 0 || isInitial)) {
-      const continueJump = window.confirm("You can continue jumping. Do you want to continue?");
-      if (continueJump) {
-        setSelectedTile(newSelected);
-        setPossibleMoves(nextJumps);
-        setMultiJumpActive(true);
-        setTurnMessage(`${turn === "B" ? "Black" : "White"}: Continue jumping`);
-        return;
-      }
+    if (nextJumps.length > 0) {
+      setSelectedTile(newSelected);
+      setPossibleMoves(nextJumps);
+      setMultiJumpActive(true);
+      setTurnMessage(`${turn === "B" ? "Black" : "White"}: Continue jumping or End Turn`);
+    } else {
+      endTurnHelper(newBoard);
     }
+  };
 
+  const endTurnHelper = (newBoard) => {
     const nextTurn = turn === "B" ? "W" : "B";
+
     if (!hasAnyValidMoves(nextTurn, newBoard)) {
       setWinner(turn);
       setTurnMessage(`Game Over - ${turn === "B" ? "Black" : "White"} Wins!`);
@@ -225,7 +269,6 @@ function GameBoard() {
     setSelectedTile(null);
     setPossibleMoves([]);
     setMultiJumpActive(false);
-    setMultiJumpPath([]);
     setTurn(nextTurn);
     setTurnMessage(
       nextTurn === "B"
@@ -234,35 +277,72 @@ function GameBoard() {
     );
   };
 
+  const handleEndTurn = () => {
+    saveHistory();
+    endTurnHelper(board);
+  };
+
   return (
     <div>
       <div className="game-container">
         <h1>Kōnane Game</h1>
         <NavBar />
-        <p className="turn-message">{turnMessage}</p>
+       {/* NEW: Show color choice ONLY if mode is pvc and playerColor is null */}
+       {mode === "pvc" && playerColor === null && (
+          <div className="color-choice-container">
+            <p>Choose your color:</p>
+            <button onClick={() => handlePlayerColorChoice("B")}>Black</button>
+            <button onClick={() => handlePlayerColorChoice("W")}>White</button>
+          </div>
+        )}
+
+        {/* NEW: Show game board only if
+          - mode is pvp (playerColor is always set to "B" above), OR
+          - mode is pvc and playerColor is chosen */}
+        {(mode === "pvp" || (mode === "pvc" && playerColor !== null)) && (
+          <>
+        <p className={`turn-message ${pulseActive ? "pulse" : ""}`}>{turnMessage}</p>
+
+        {removalPhase.B && removalPhase.W && (
+          <div className="button-container">
+            <button
+              onClick={handleUndo}
+              disabled={history.length === 0}
+              className="button undo-button"
+            >
+              Undo
+            </button>
+            <button
+              onClick={handleEndTurn}
+              disabled={winner !== null}
+              className="button end-turn-button"
+            >
+              End Turn
+            </button>
+          </div>
+        )}
+
         <div className="game-board">
           {board.map((row, rowIndex) => (
             <div key={rowIndex} className="board-row">
               {row.map((tile, colIndex) => (
                 <div
                   key={colIndex}
-                  className={`board-tile ${
-                    possibleMoves.some(
-                      (move) => move.row === tile.row && move.col === tile.col
-                    )
-                      ? "highlight"
-                      : ""
-                  } ${
-                    selectedTile &&
-                    selectedTile.row === tile.row &&
-                    selectedTile.col === tile.col
+                  className={`board-tile ${possibleMoves.some(
+                    (move) => move.row === tile.row && move.col === tile.col
+                  )
+                    ? "highlight"
+                    : ""
+                    } ${selectedTile &&
+                      selectedTile.row === tile.row &&
+                      selectedTile.col === tile.col
                       ? "selected"
                       : ""
-                  }`}
+                    }`}
                   onClick={() => handleTileClick(tile.row, tile.col)}
                   style={{
                     backgroundColor:
-                      (rowIndex + colIndex) % 2 === 0 ? "#ffffff" : "#000000",
+                      (rowIndex + colIndex) % 2 === 0 ? "#C49E6C" : "#D2B48C",
                   }}
                 >
                   {tile.piece && (
@@ -277,7 +357,62 @@ function GameBoard() {
             </div>
           ))}
         </div>
+
+        <button
+          className="reset-button"
+          onClick={() => setShowResetConfirmation(true)}
+        >
+          Reset Board
+        </button>
+
+        {showResetConfirmation && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <p>Are you sure you want to reset the board?</p>
+              <button
+                className="yes-button"
+                onClick={() => {
+                  resetGame();
+                  setShowResetConfirmation(false);
+                }}
+              >
+                Yes
+              </button>
+              <button
+                className="no-button"
+                onClick={() => setShowResetConfirmation(false)}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showWinnerModal && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <p>{winner === "B" ? "Black wins!" : "White wins!"}</p>
+              <button
+                onClick={() => {
+                  resetGame();
+                }}
+                className="button"
+              >
+                Play Again
+              </button>
+              <button
+                onClick={() => setShowWinnerModal(false)}
+                className="button"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+        </>
+        )}
       </div>
+      
     </div>
   );
 }
