@@ -75,7 +75,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease, border 0.3s ease;
+  transition: transform 0.5s ease, background-color 0.5s ease, box-shadow 0.5s ease, border 0.5s ease;
   cursor: pointer;
   user-select: none;
 }
@@ -471,3 +471,18 @@ button:hover {
     transform: scale(1);
   }
 }
+
+.computer-move-highlight {
+  
+  transition: box-shadow 0.3s ease-in-out;
+  border: 2px solid rgb(255, 11, 11);
+}
+
+.computer-move-from {
+  outline: 3px solid red; /* or another highlight style */
+}
+
+.computer-move-to {
+  outline: 3px solid green; /* or another highlight style */
+}
+

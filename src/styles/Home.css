@@ -92,3 +92,8 @@ footer {
   font-style: italic;
   letter-spacing: 0.5px;
 }
+
+.tile.highlight {
+  box-shadow: 0 0 10px 4px yellow;
+  transition: box-shadow 0.5s ease;
+}
